@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ransomware Watch</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+  <style>
+:root {
+  --paper: #e9edf0;
+  --surface: #f6f8f9;
+  --ink: #12202e;
+  --ink-soft: #4b5b6a;
+  --line: #c6cfd6;
+  --calm: #0b7a75;
+  --watch: #c98a0a;
+  --alert: #c62f2f;
+  --idle: #7a8794;
+  --level: var(--idle);
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #101a24;
+    --surface: #17232f;
+    --ink: #e7edf2;
+    --ink-soft: #9aabba;
+    --line: #2b3b4a;
+    --calm: #3fc2b8;
+    --watch: #f0b43c;
+    --alert: #ff6b66;
+    --idle: #6f8190;
+  }
+}
+body[data-level="calm"]  { --level: var(--calm); }
+body[data-level="watch"] { --level: var(--watch); }
+body[data-level="alert"] { --level: var(--alert); }
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0; color: var(--ink); background: var(--paper);
+  font: 400 16px/1.55 var(--body);
+}
+main, .bar { max-width: 1040px; margin: 0 auto; padding-inline: 24px; }
+button, input { font: inherit; color: inherit; }
+button { min-height: 44px; }
+:focus-visible { outline: 3px solid var(--level); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.bar { display: flex; align-items: center; justify-content: space-between; padding-block: 18px; }
+.name { font: 700 18px var(--display); letter-spacing: -0.01em; }
+.pill {
+  font-size: 14px; padding: 4px 12px; border-radius: 999px;
+  border: 1.5px solid var(--level); color: var(--ink);
+}
+
+/* hero */
+.hero {
+  display: grid; grid-template-columns: 1fr minmax(240px, 340px); gap: 40px;
+  align-items: center; padding-block: 36px 28px;
+}
+h1 {
+  font: 700 clamp(30px, 5.2vw, 52px)/1.06 var(--display);
+  letter-spacing: -0.025em; margin: 0 0 14px; max-width: 16ch;
+}
+#subline { margin: 0 0 24px; color: var(--ink-soft); max-width: 52ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button {
+  cursor: pointer; border-radius: 8px; padding: 10px 18px; border: 1.5px solid var(--ink);
+  background: transparent; transition: background .15s, transform .1s;
+}
+button:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+button:active { transform: translateY(1px); }
+button.primary { background: var(--ink); color: var(--paper); }
+button.primary:hover { background: color-mix(in srgb, var(--ink) 85%, var(--paper)); }
+button.plain { border-color: var(--line); }
+button.small { padding: 4px 12px; font-size: 14px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.notice { margin: 16px 0 0; padding: 10px 14px; border-left: 4px solid var(--watch); background: var(--surface); max-width: 60ch; }
+.progress { margin: 14px 0 0; font-family: var(--mono); font-size: 14px; color: var(--ink-soft); }
+
+.gauge { margin: 0; text-align: center; }
+.gauge svg { width: 100%; height: auto; overflow: visible; }
+.gauge .track, .gauge .value { fill: none; stroke-width: 14; stroke-linecap: round; }
+.gauge .track { stroke: var(--line); }
+.gauge .value {
+  stroke: var(--level); stroke-dasharray: 282.74; stroke-dashoffset: 282.74;
+  transition: stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1), stroke .3s;
+}
+.gauge .tick { stroke: var(--ink-soft); stroke-width: 2; opacity: .6; }
+.gauge figcaption { margin-top: -62px; position: relative; display: flex; flex-direction: column; align-items: center; }
+.gauge b { font: 700 64px/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.gauge figcaption span { color: var(--ink-soft); font-size: 14px; }
+
+/* alert banner */
+.latch {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px;
+  background: var(--alert); color: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
+}
+.latch p { margin: 4px 0 0; }
+.latch button { border-color: #fff; color: #fff; flex: none; }
+.latch button:hover { background: rgba(255,255,255,.15); }
+@media (prefers-color-scheme: dark) { .latch { background: #8f2424; } }
+body[data-level="alert"] .latch:not([hidden]) { animation: pulse 1.2s ease-out 1; }
+@keyframes pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--alert) 60%, transparent); } to { box-shadow: 0 0 0 18px transparent; } }
+
+/* stats strip */
+.strip {
+  display: grid; grid-template-columns: repeat(3, auto) 1fr; gap: 0; margin: 0 0 28px;
+  border-block: 1px solid var(--line);
+}
+.strip > div { padding: 14px 24px 14px 0; margin-right: 24px; border-right: 1px solid var(--line); min-width: 0; }
+.strip > div:last-child { border-right: 0; margin-right: 0; }
+.strip dt { font-size: 13px; color: var(--ink-soft); }
+.strip dd { margin: 2px 0 0; font: 500 22px var(--display); font-variant-numeric: tabular-nums; }
+.strip dd.path { font: 400 14px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 6px; }
+
+/* feed */
+.feed-head { display: flex; justify-content: space-between; align-items: center; }
+h2 { font: 700 22px var(--display); margin: 0; letter-spacing: -0.01em; }
+.table-wrap { margin-top: 12px; max-height: 380px; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { position: sticky; top: 0; background: var(--surface); text-align: left; font-weight: 500; color: var(--ink-soft); padding: 10px 14px; border-bottom: 1px solid var(--line); }
+td { padding: 8px 14px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); vertical-align: top; }
+td:nth-child(1) { white-space: nowrap; font-family: var(--mono); color: var(--ink-soft); }
+td:nth-child(3) { font-family: var(--mono); word-break: break-all; }
+tr.flag td:first-child { box-shadow: inset 4px 0 0 var(--alert); }
+td.empty { text-align: center; color: var(--ink-soft); padding: 28px; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 4px; margin: 0 4px 2px 0; background: color-mix(in srgb, var(--alert) 16%, transparent); color: var(--ink); border: 1px solid color-mix(in srgb, var(--alert) 50%, transparent); }
+
+/* panels */
+.panel { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.panel:last-of-type { margin-bottom: 48px; }
+summary { cursor: pointer; font: 500 17px var(--display); padding: 4px 0; }
+.settings { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; padding: 14px 0 4px; }
+.settings label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink-soft); }
+input[type="number"] { width: 130px; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface); }
+.fine { font-size: 13px; color: var(--ink-soft); margin: 8px 0 0; }
+.prose { max-width: 70ch; padding-top: 8px; }
+.prose ul { padding-left: 20px; }
+.prose li { margin-bottom: 6px; }
+code { font: 400 0.9em var(--mono); background: var(--surface); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; gap: 12px; }
+  .gauge { max-width: 300px; margin-inline: auto; }
+  .strip { grid-template-columns: 1fr 1fr; }
+  .strip > div { border-right: 0; margin: 0; padding: 12px 0; }
+  .strip > .wide { grid-column: 1 / -1; }
+  table { min-width: 600px; }
+}
+@media (max-width: 480px) {
+  main, .bar { padding-inline: 16px; }
+  .bar { gap: 12px; padding-block: 14px; }
+  .name { font-size: 16px; }
+  .pill { font-size: 12px; padding: 4px 9px; text-align: center; }
+  .hero { padding-block: 24px 20px; }
+  .actions { gap: 8px; }
+  .actions button { flex: 1 1 auto; padding-inline: 12px; }
+  .strip > div { padding-right: 8px; }
+  .strip dd { font-size: 19px; }
+  .latch { align-items: flex-start; padding: 14px; gap: 12px; }
+  .latch button { padding-inline: 12px; }
+  .settings { gap: 14px; }
+  input[type="number"] { min-height: 44px; font-size: 16px; }
+  .table-wrap { max-height: 480px; }
+  table { min-width: 0; }
+  thead { display: none; }
+  tbody tr { display: grid; grid-template-columns: 1fr 1fr; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  tbody td { min-width: 0; padding: 4px 0; border: 0; overflow-wrap: anywhere; }
+  tbody td::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--ink-soft); font: 400 11px/1.3 var(--body); text-transform: uppercase; letter-spacing: .04em; }
+  tbody td:nth-child(3), tbody td:nth-child(4) { grid-column: 1 / -1; }
+  tbody td.empty { grid-column: 1 / -1; padding: 20px 8px; }
+  tbody td.empty::before { content: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+  </style>
+</head>
+<body data-level="idle">
+  <header class="bar">
+    <span class="name">Ransomware Watch</span>
+    <span id="pill" class="pill">Not watching</span>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="headline">
+      <div class="read">
+        <h1 id="headline">Choose a folder to watch.</h1>
+        <p id="subline">The page checks that folder every few seconds and warns you if files start changing the way they do during a ransomware attack.</p>
+
+        <div class="actions">
+          <button id="pickBtn" class="primary">Choose folder</button>
+          <button id="stopBtn" class="plain" hidden>Stop watching</button>
+          <button id="selfTestBtn" class="plain" hidden>Run self-test</button>
+          <button id="demoBtn" class="plain">Try a demo</button>
+        </div>
+        <p id="notice" class="notice" hidden></p>
+        <p id="progress" class="progress" role="status" hidden></p>
+      </div>
+
+      <figure class="gauge">
+        <svg viewBox="0 0 220 128" role="img" aria-label="Risk score gauge">
+          <path class="track" d="M20 110 A90 90 0 0 1 200 110" />
+          <path id="arc" class="value" d="M20 110 A90 90 0 0 1 200 110" />
+          <line class="tick" x1="53.4" y1="53.4" x2="39.3" y2="39.3" />
+          <line class="tick" x1="134.7" y1="33.9" x2="140.9" y2="14.9" />
+        </svg>
+        <figcaption><b id="score">0</b><span>risk score</span></figcaption>
+      </figure>
+    </section>
+
+    <section id="latch" class="latch" role="alert" hidden>
+      <div>
+        <strong id="latchTitle"></strong>
+        <p id="latchBody"></p>
+      </div>
+      <button id="dismissBtn" class="plain">Dismiss</button>
+    </section>
+
+    <dl class="strip">
+      <div><dt>Files watched</dt><dd id="statFiles">0</dd></div>
+      <div><dt>Changes in last <span id="statWin">5</span> s</dt><dd id="statBurst">0</dd></div>
+      <div><dt>Last check</dt><dd id="statLast">–</dd></div>
+      <div class="wide"><dt>Folder</dt><dd id="statFolder" class="path">None chosen</dd></div>
+    </dl>
+
+    <section class="feed" aria-labelledby="feedTitle">
+      <div class="feed-head">
+        <h2 id="feedTitle">Activity</h2>
+        <button id="clearBtn" class="plain small">Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Change</th><th>File</th><th>Warning signs</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="4" class="empty">Nothing yet. Changes will appear here as they happen.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <details class="panel">
+      <summary>Settings</summary>
+      <div class="settings">
+        <label>Changes that count as a burst
+          <input id="optThreshold" type="number" min="3" max="200" value="10">
+        </label>
+        <label>Burst window (seconds)
+          <input id="optWindow" type="number" min="1" max="60" value="5">
+        </label>
+        <label>Check the folder every (seconds)
+          <input id="optInterval" type="number" min="1" max="30" value="3">
+        </label>
+        <button id="notifyBtn" class="plain" hidden>Turn on desktop alerts</button>
+      </div>
+      <p class="fine">Changing the check interval takes effect the next time you start watching.</p>
+    </details>
+
+    <details class="panel">
+      <summary>How the score works</summary>
+      <div class="prose">
+        <p>The score goes from 0 to 100. Below 25 is calm, 25 to 59 is unusual activity, and 60 or more is behaviour that looks like ransomware.</p>
+        <ul>
+          <li><b>Burst of changes.</b> Up to 40 points when the number of changes in the burst window reaches your threshold. A burst alone never reaches the alert level, because backups, installs and builds do the same thing.</li>
+          <li><b>Random-looking contents.</b> 25 points per file whose first 16 KB went from ordinary data to near-random data, which is what encryption produces. Zip, Office, image, audio and video files are skipped because they always look random.</li>
+          <li><b>Ransomware-style extensions.</b> 30 points per file created or renamed to something like <code>.locked</code> or <code>.lockbit</code>.</li>
+          <li><b>Appended extensions.</b> 20 points per file renamed from <code>report.docx</code> to <code>report.docx.something</code>.</li>
+          <li><b>Ransom note.</b> 40 points when a file named like <code>HOW_TO_DECRYPT_FILES.txt</code> appears.</li>
+          <li><b>Deletions.</b> 4 points per deleted file, up to 20.</li>
+        </ul>
+        <p>Strong signals count for 60 seconds. When the score reaches the alert level, a banner stays on screen until you dismiss it.</p>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>What this can and can't do</summary>
+      <div class="prose">
+        <p>It warns you. It can't stop, block or undo anything, so keep real backups and use proper antivirus alongside it.</p>
+        <p>It only sees the folder you choose, and only while this tab is open. Chrome asks for permission each time, and your files are never uploaded: everything is analysed in this tab. Mobile browsers generally do not allow web pages to continuously monitor folders, so on a phone you can use the demo but not live folder monitoring.</p>
+        <p>It can miss ransomware that encrypts slowly, or that encrypts files which already look random. It can raise false alarms during large legitimate jobs.</p>
+      </div>
+    </details>
+  </main>
+
+  <script type="module">
+// Detection engine. Pure logic, no browser APIs, so it can be unit-tested in Node.
+//
+// Signals (each is a heuristic, none is proof of ransomware):
+//   burst     many file changes in a short window
+//   entropy   a file's contents jumped from low to high randomness (encryption looks like noise)
+//   ext       a file was created/renamed with a known ransomware extension
+//   appended  "report.docx" was replaced by "report.docx.<something>"
+//   note      a file named like a ransom note appeared
+//   delete    many files deleted
+
+const DEFAULTS = Object.freeze({
+  threshold: 10,        // changes inside windowSec that count as a full burst
+  windowSec: 5,
+  signalWindowSec: 60,  // strong signals stay in the score this long
+});
+
+const LEVELS = Object.freeze({ watch: 25, alert: 60 });
+
+const SUSPICIOUS_EXT = new Set([
+  'locked', 'encrypted', 'encrypt', 'crypt', 'crypted', 'crypto', 'enc',
+  'cerber', 'locky', 'wncry', 'wnry', 'wcry', 'ryk', 'ryuk', 'conti', 'lockbit',
+  'akira', 'blackcat', 'petya', 'zepto', 'crab', 'dharma', 'phobos', 'djvu',
+  'medusa', 'babuk', 'clop', 'cl0p', 'mallox', 'rhysida', 'crinf', 'kraken',
+]);
+
+// Formats that are naturally high-entropy: their entropy says nothing about encryption.
+const COMPRESSED = new Set([
+  'zip', '7z', 'rar', 'gz', 'bz2', 'xz', 'zst', 'tgz', 'jar', 'apk',
+  'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'avif',
+  'mp3', 'aac', 'flac', 'ogg', 'm4a', 'mp4', 'mkv', 'mov', 'avi', 'webm',
+  'pdf', 'woff', 'woff2',
+]);
+
+const NOTE_PATTERN =
+  /(how[_\- .]?to[_\- .]?(decrypt|recover|restore|get)|(decrypt|recover|restore)[_\- .]?(my[_\- .]?)?(your[_\- .]?)?(files|data|instructions)|ransom|your[_\- .]?files[_\- .]?(are|have)|readme[_\- .]?(to[_\- .]?)?(decrypt|restore|recover)|_readme_|!{3,})/i;
+const NOTE_EXT = new Set(['txt', 'html', 'htm', 'hta', 'rtf', 'url']);
+
+function extOf(path) {
+  const name = path.split('/').pop();
+  const i = name.lastIndexOf('.');
+  return i > 0 ? name.slice(i + 1).toLowerCase() : '';
+}
+
+function baseName(path) {
+  return path.split('/').pop();
+}
+
+function shannonEntropy(bytes) {
+  if (!bytes || !bytes.length) return 0;
+  const counts = new Uint32Array(256);
+  for (let i = 0; i < bytes.length; i++) counts[bytes[i]]++;
+  let h = 0;
+  const n = bytes.length;
+  for (let i = 0; i < 256; i++) {
+    if (counts[i]) {
+      const p = counts[i] / n;
+      h -= p * Math.log2(p);
+    }
+  }
+  return h;
+}
+
+function entropyEligible(path) {
+  return !COMPRESSED.has(extOf(path));
+}
+
+function isSuspiciousExt(path) {
+  return SUSPICIOUS_EXT.has(extOf(path));
+}
+
+function looksLikeRansomNote(path) {
+  return NOTE_EXT.has(extOf(path)) && NOTE_PATTERN.test(baseName(path));
+}
+
+/**
+ * Compare two snapshots (Map<path, {size, mtime, ent}>) and list what changed.
+ * A delete+create pair with identical size and mtime is reported as a rename.
+ * A delete of "x.doc" plus a create of "x.doc.abc" is reported as an appended-extension rename.
+ */
+function diffSnapshots(prev, curr) {
+  const changes = [];
+  const created = [];
+  const deletedByKey = new Map();   // "size|mtime" -> [paths]
+  const deletedSet = new Set();
+
+  for (const [path, c] of curr) {
+    const o = prev.get(path);
+    if (!o) created.push(path);
+    else if (o.size !== c.size || o.mtime !== c.mtime) {
+      changes.push({ kind: 'modified', path, size: c.size, ent: c.ent, prevEnt: o.ent });
+    }
+  }
+  for (const [path, o] of prev) {
+    if (curr.has(path)) continue;
+    deletedSet.add(path);
+    const key = `${o.size}|${o.mtime}`;
+    if (!deletedByKey.has(key)) deletedByKey.set(key, []);
+    deletedByKey.get(key).push(path);
+  }
+
+  const leftover = [];
+  for (const path of created) {
+    const c = curr.get(path);
+    const bucket = deletedByKey.get(`${c.size}|${c.mtime}`);
+    if (bucket && bucket.length) {
+      const from = bucket.pop();
+      deletedSet.delete(from);
+      changes.push({
+        kind: 'renamed', path, from, size: c.size, ent: c.ent, prevEnt: prev.get(from).ent,
+        appended: path.startsWith(from + '.'),
+      });
+    } else leftover.push(path);
+  }
+
+  for (const path of leftover) {
+    const c = curr.get(path);
+    const stem = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : null;
+    if (stem && deletedSet.has(stem)) {
+      deletedSet.delete(stem);
+      changes.push({
+        kind: 'renamed', path, from: stem, size: c.size, ent: c.ent,
+        prevEnt: prev.get(stem).ent, appended: true,
+      });
+    } else {
+      changes.push({ kind: 'created', path, size: c.size, ent: c.ent, prevEnt: null });
+    }
+  }
+
+  for (const path of deletedSet) changes.push({ kind: 'deleted', path, size: 0, ent: null, prevEnt: null });
+  return changes;
+}
+
+/** Which warning signs does a single change show? */
+function classify(change) {
+  const signals = [];
+  const { kind, path } = change;
+  if ((kind === 'created' || kind === 'renamed') && isSuspiciousExt(path)) signals.push('ext');
+  if (kind === 'renamed' && change.appended) signals.push('appended');
+  if (kind === 'created' && looksLikeRansomNote(path)) signals.push('note');
+  if (
+    (kind === 'modified' || kind === 'renamed') &&
+    entropyEligible(path) &&
+    change.ent != null && change.prevEnt != null &&
+    change.ent >= 7.2 && change.prevEnt <= 6.5
+  ) signals.push('entropy');
+  return signals;
+}
+
+class Analyzer {
+  constructor(opts = {}) {
+    this.opts = { ...DEFAULTS, ...opts };
+    this.events = [];
+  }
+
+  configure(opts) {
+    Object.assign(this.opts, opts);
+  }
+
+  reset() {
+    this.events = [];
+  }
+
+  ingest(changes, now = Date.now()) {
+    const out = [];
+    for (const ch of changes) {
+      const ev = { t: now, ...ch, signals: classify(ch) };
+      this.events.push(ev);
+      out.push(ev);
+    }
+    this._prune(now);
+    return out;
+  }
+
+  _prune(now) {
+    const keepMs = Math.max(this.opts.signalWindowSec, this.opts.windowSec) * 1000;
+    while (this.events.length && now - this.events[0].t > keepMs) this.events.shift();
+    if (this.events.length > 5000) this.events.splice(0, this.events.length - 5000);
+  }
+
+  assess(now = Date.now()) {
+    this._prune(now);
+    const { threshold, windowSec, signalWindowSec } = this.opts;
+    const burstEvents = this.events.filter(e => now - e.t <= windowSec * 1000);
+    const sigEvents = this.events.filter(e => now - e.t <= signalWindowSec * 1000);
+    const count = (name) => sigEvents.filter(e => e.signals.includes(name)).length;
+
+    const parts = [];
+    const add = (points, text) => { if (points > 0) parts.push({ points, text }); };
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+    const burstPts = Math.min(40, Math.round((40 * burstEvents.length) / threshold));
+    if (burstEvents.length >= Math.ceil(threshold / 2)) {
+      add(burstPts, `${plural(burstEvents.length, 'change')} in the last ${windowSec} s`);
+    }
+
+    const ent = count('entropy');
+    add(Math.min(50, ent * 25), `${plural(ent, 'file')} turned into random-looking data`);
+
+    const ext = count('ext');
+    add(Math.min(60, ext * 30), `${plural(ext, 'file')} with a ransomware-style extension`);
+
+    const app = count('appended');
+    add(Math.min(40, app * 20), `${plural(app, 'file')} renamed by appending an extension`);
+
+    const note = count('note');
+    add(Math.min(40, note * 40), `A file named like a ransom note appeared`);
+
+    const del = sigEvents.filter(e => e.kind === 'deleted').length;
+    add(Math.min(20, del * 4), `${plural(del, 'file')} deleted`);
+
+    const score = Math.min(100, parts.reduce((s, p) => s + p.points, 0));
+    const level = score >= LEVELS.alert ? 'alert' : score >= LEVELS.watch ? 'watch' : 'calm';
+    return { score, level, burstCount: burstEvents.length, reasons: parts.map(p => p.text) };
+  }
+}
+
+// Reads a folder the user picked in Chrome and returns a snapshot of it.
+// Browsers cannot "watch" a folder, so the app takes a snapshot every few seconds
+// and compares it with the previous one (see detector.js: diffSnapshots).
+
+
+const SAMPLE_BYTES = 16384;
+const MAX_FILES = 5000;
+const MAX_DEPTH = 8;
+const MAX_BASELINE_READS = 1500;
+const MAX_READS_PER_SCAN = 300;
+const SKIP_DIRS = new Set(['node_modules', '.git']);
+
+const supported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
+async function pickFolder() {
+  return window.showDirectoryPicker({ id: 'ransomware-watch', mode: 'read' });
+}
+
+async function listFiles(dir, prefix, depth, out) {
+  for await (const [name, handle] of dir.entries()) {
+    if (out.length >= MAX_FILES) return;
+    const path = prefix ? `${prefix}/${name}` : name;
+    if (handle.kind === 'file') out.push({ path, handle });
+    else if (depth < MAX_DEPTH && !SKIP_DIRS.has(name)) await listFiles(handle, path, depth + 1, out);
+  }
+}
+
+/**
+ * @param dirHandle  the folder the user chose
+ * @param prev       previous snapshot (Map) or null on the first scan
+ * @returns { snapshot: Map<path,{size,mtime,ent}>, truncated: boolean }
+ */
+async function scan(dirHandle, prev) {
+  const files = [];
+  await listFiles(dirHandle, '', 0, files);
+  const snapshot = new Map();
+  let reads = 0;
+  const readLimit = prev ? MAX_READS_PER_SCAN : MAX_BASELINE_READS;
+
+  for (const { path, handle } of files) {
+    let file;
+    try {
+      file = await handle.getFile();
+    } catch {
+      continue; // file vanished or is locked between listing and reading
+    }
+    const old = prev && prev.get(path);
+    let ent = old ? old.ent : null;
+    const changed = !old || old.size !== file.size || old.mtime !== file.lastModified;
+
+    if (changed && file.size > 0 && entropyEligible(path) && reads < readLimit) {
+      try {
+        const buf = await file.slice(0, SAMPLE_BYTES).arrayBuffer();
+        ent = shannonEntropy(new Uint8Array(buf));
+        reads++;
+      } catch {
+        // unreadable right now; keep previous entropy value
+      }
+    }
+    snapshot.set(path, { size: file.size, mtime: file.lastModified, ent });
+  }
+  return { snapshot, truncated: files.length >= MAX_FILES };
+}
+
+/** Timer that keeps ticking when the tab is in the background (workers are not throttled like page timers). */
+function makeTicker(ms, onTick) {
+  const code = `let id; onmessage = e => { clearInterval(id); if (e.data === 'start') id = setInterval(() => postMessage(1), ${Number(ms)}); };`;
+  const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+  const worker = new Worker(url);
+  worker.onmessage = onTick;
+  worker.postMessage('start');
+  return () => {
+    worker.postMessage('stop');
+    worker.terminate();
+    URL.revokeObjectURL(url);
+  };
+}
+
+// ---- Self-test: writes NEW harmless files in a sub-folder, then removes them ----
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function writeFile(dir, name, data) {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  await w.write(data);
+  await w.close();
+}
+
+function randomBytes(n) {
+  const out = new Uint8Array(n);
+  for (let o = 0; o < n; o += 65536) crypto.getRandomValues(out.subarray(o, Math.min(n, o + 65536)));
+  return out;
+}
+
+/**
+ * Imitates what ransomware does, but only to files it creates itself inside
+ * "_detector_selftest". Your own files are never opened for writing.
+ */
+async function runSelfTest(rootHandle, waitMs, onStep) {
+  const perm = await rootHandle.requestPermission({ mode: 'readwrite' });
+  if (perm !== 'granted') throw new Error('Write permission was not granted, so the self-test cannot run.');
+
+  const dir = await rootHandle.getDirectoryHandle('_detector_selftest', { create: true });
+  const sentence = 'Quarterly notes: nothing unusual to report this week. ';
+  const text = new TextEncoder().encode(sentence.repeat(500));
+  const names = Array.from({ length: 8 }, (_, i) => `sample_${i + 1}.txt`);
+
+  try {
+    onStep('Step 1 of 3: creating 8 plain-text sample files');
+    for (const n of names) await writeFile(dir, n, text);
+    await sleep(waitMs);
+
+    onStep('Step 2 of 3: overwriting them with random data (what encryption looks like)');
+    for (const n of names) await writeFile(dir, n, randomBytes(20000));
+    await sleep(waitMs);
+
+    onStep('Step 3 of 3: adding .locked files and a fake ransom note');
+    for (const n of names.slice(0, 4)) await writeFile(dir, `${n}.locked`, randomBytes(2048));
+    await writeFile(dir, 'HOW_TO_DECRYPT_FILES.txt', 'Self-test note. Nothing was encrypted.');
+    await sleep(waitMs + 2000);
+  } finally {
+    onStep('Cleaning up test files');
+    try {
+      await rootHandle.removeEntry('_detector_selftest', { recursive: true });
+    } catch {
+      // if removal fails the person can delete the folder by hand
+    }
+  }
+}
+
+
+const $ = (id) => document.getElementById(id);
+const analyzer = new Analyzer();
+
+const state = {
+  mode: 'idle',          // idle | watching | demo
+  root: null,
+  prev: null,
+  files: 0,
+  lastScan: null,
+  scanning: false,
+  stopTicker: null,
+  demoTimer: null,
+  feed: [],
+  prevLevel: 'calm',
+  selfTesting: false,
+};
+
+const SIGNAL_LABEL = {
+  ext: 'Ransomware extension',
+  appended: 'Extension appended',
+  note: 'Ransom-note name',
+  entropy: 'Contents became random',
+};
+const KIND_LABEL = { created: 'Created', modified: 'Modified', deleted: 'Deleted', renamed: 'Renamed' };
+
+// ---------- helpers ----------
+
+const pad = (n) => String(n).padStart(2, '0');
+const clock = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+
+function showNotice(text) {
+  $('notice').textContent = text || '';
+  $('notice').hidden = !text;
+}
+function showProgress(text) {
+  $('progress').textContent = text || '';
+  $('progress').hidden = !text;
+}
+function readSettings() {
+  const num = (id, fallback, min, max) => {
+    const v = Number($(id).value);
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+  };
+  return {
+    threshold: num('optThreshold', 10, 3, 200),
+    windowSec: num('optWindow', 5, 1, 60),
+    intervalSec: num('optInterval', 3, 1, 30),
+  };
+}
+
+// ---------- rendering ----------
+
+function renderFeed() {
+  const rows = $('rows');
+  rows.replaceChildren();
+  if (!state.feed.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4; td.className = 'empty';
+    td.textContent = 'Nothing yet. Changes will appear here as they happen.';
+    tr.append(td); rows.append(tr);
+    return;
+  }
+  for (const ev of state.feed.slice(0, 200)) {
+    const tr = document.createElement('tr');
+    if (ev.signals.length) tr.className = 'flag';
+    const time = document.createElement('td'); time.dataset.label = 'Time'; time.textContent = clock(ev.t);
+    const kind = document.createElement('td'); kind.dataset.label = 'Change'; kind.textContent = KIND_LABEL[ev.kind] || ev.kind;
+    const file = document.createElement('td');
+    file.dataset.label = 'File';
+    file.textContent = ev.kind === 'renamed' ? `${ev.from}  →  ${ev.path}` : ev.path;   // textContent: file names are untrusted
+    const sig = document.createElement('td');
+    sig.dataset.label = 'Warning signs';
+    for (const s of ev.signals) {
+      const tag = document.createElement('span');
+      tag.className = 'tag'; tag.textContent = SIGNAL_LABEL[s] || s;
+      sig.append(tag);
+    }
+    tr.append(time, kind, file, sig);
+    rows.append(tr);
+  }
+}
+
+function headlineFor(mode, a) {
+  const demo = mode === 'demo' ? 'Demo: ' : '';
+  if (mode === 'idle') return {
+    h: 'Choose a folder to watch.',
+    s: 'The page checks that folder every few seconds and warns you if files start changing the way they do during a ransomware attack.',
+  };
+  if (a.level === 'alert') return {
+    h: `${demo}This looks like ransomware.`,
+    s: `${a.reasons.join('. ')}. ${mode === 'demo' ? 'No real files were touched.' : 'Disconnect this computer from the network and avoid opening the affected files.'}`,
+  };
+  if (a.level === 'watch') return {
+    h: `${demo}Unusual activity.`,
+    s: `${a.reasons.join('. ') || 'More changes than usual'}. This can be a backup, install or build, so check what is running.`,
+  };
+  return {
+    h: mode === 'demo' ? 'Demo: all quiet so far.' : (state.lastScan ? `Quiet. ${state.files.toLocaleString()} files watched.` : 'Reading the folder…'),
+    s: mode === 'demo' ? 'Watch the score as simulated activity ramps up. No real files are involved.' : 'Nothing unusual in the last minute.',
+  };
+}
+
+function render() {
+  const now = Date.now();
+  const a = analyzer.assess(now);
+  const level = state.mode === 'idle' ? 'idle' : a.level;
+
+  document.body.dataset.level = level;
+  $('score').textContent = state.mode === 'idle' ? '0' : a.score;
+  $('arc').style.strokeDashoffset = String(282.74 * (1 - (state.mode === 'idle' ? 0 : a.score) / 100));
+
+  const { h, s } = headlineFor(state.mode, a);
+  $('headline').textContent = h;
+  $('subline').textContent = s;
+
+  $('pill').textContent = {
+    idle: 'Not watching',
+    calm: state.mode === 'demo' ? 'Demo running' : 'Watching',
+    watch: 'Unusual activity',
+    alert: 'Alert',
+  }[level];
+
+  $('pickBtn').hidden = state.mode !== 'idle';
+  $('demoBtn').hidden = state.mode !== 'idle';
+  $('stopBtn').hidden = state.mode === 'idle';
+  $('stopBtn').textContent = state.mode === 'demo' ? 'End demo' : 'Stop watching';
+  $('selfTestBtn').hidden = state.mode !== 'watching';
+  $('selfTestBtn').disabled = state.selfTesting;
+
+  $('statFiles').textContent = state.mode === 'watching' ? state.files.toLocaleString() : '0';
+  $('statBurst').textContent = a.burstCount;
+  $('statWin').textContent = analyzer.opts.windowSec;
+  $('statLast').textContent = state.lastScan ? clock(state.lastScan) : '–';
+  $('statFolder').textContent = state.mode === 'watching' && state.root ? state.root.name : (state.mode === 'demo' ? 'Simulated (no folder)' : 'None chosen');
+
+  // Latch the banner when we enter the alert level.
+  if (state.mode !== 'idle' && a.level === 'alert' && state.prevLevel !== 'alert') raiseAlert(a);
+  state.prevLevel = state.mode === 'idle' ? 'calm' : a.level;
+  document.title = level === 'alert' ? '⚠ Alert – Ransomware Watch' : 'Ransomware Watch';
+}
+
+function raiseAlert(a) {
+  $('latchTitle').textContent = `Possible ransomware activity at ${clock(Date.now())}`;
+  $('latchBody').textContent = `${a.reasons.join('. ')}.`;
+  $('latch').hidden = false;
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('Possible ransomware activity', { body: a.reasons.join('. ') }); } catch { /* some browsers block constructor use */ }
+  }
+}
+
+function addFeed(events) {
+  state.feed.unshift(...events.slice().reverse());
+  if (state.feed.length > 300) state.feed.length = 300;
+  renderFeed();
+}
+
+// ---------- watching a real folder ----------
+
+async function tick() {
+  if (state.scanning || !state.root || state.mode !== 'watching') return;
+  state.scanning = true;
+  try {
+    const { snapshot, truncated } = await scan(state.root, state.prev);
+    if (state.mode !== 'watching') return;   // stopped while scanning
+    if (state.prev) {
+      const changes = diffSnapshots(state.prev, snapshot);
+      if (changes.length) addFeed(analyzer.ingest(changes));
+    } else {
+      showProgress('');
+    }
+    state.prev = snapshot;
+    state.files = snapshot.size;
+    state.lastScan = Date.now();
+    showNotice(truncated ? 'This folder is large, so only the first 5,000 files are being watched. Choose a smaller folder for full coverage.' : '');
+  } catch (err) {
+    stopAll();
+    showNotice(`Lost access to the folder (${err.name}). Choose it again to resume.`);
+  } finally {
+    state.scanning = false;
+    render();
+  }
+}
+
+async function startWatching() {
+  showNotice('');
+  let handle;
+  try {
+    handle = await pickFolder();
+  } catch (err) {
+    if (err.name !== 'AbortError') showNotice(`The browser could not open that folder (${err.message}). Pick a sub-folder instead of a drive root or system folder.`);
+    return;
+  }
+  const cfg = readSettings();
+  analyzer.reset();
+  analyzer.configure({ threshold: cfg.threshold, windowSec: cfg.windowSec });
+  state.root = handle;
+  state.prev = null;
+  state.files = 0;
+  state.lastScan = null;
+  state.feed = [];
+  state.mode = 'watching';
+  renderFeed();
+  showProgress('Reading the folder to learn what normal looks like…');
+  state.stopTicker = makeTicker(cfg.intervalSec * 1000, tick);
+  tick();
+  render();
+}
+
+function stopAll() {
+  if (state.stopTicker) state.stopTicker();
+  state.stopTicker = null;
+  if (state.demoTimer) clearInterval(state.demoTimer);
+  state.demoTimer = null;
+  state.mode = 'idle';
+  state.root = null;
+  state.prev = null;
+  showProgress('');
+  render();
+}
+
+// ---------- demo (nothing touches disk) ----------
+
+function startDemo() {
+  showNotice('');
+  const cfg = readSettings();
+  analyzer.reset();
+  analyzer.configure({ threshold: cfg.threshold, windowSec: cfg.windowSec });
+  state.mode = 'demo';
+  state.feed = [];
+  state.lastScan = Date.now();
+  renderFeed();
+
+  const docs = ['Budget 2026.xlsx', 'Photos/holiday.txt', 'Taxes/return.txt', 'Contracts/lease.txt', 'Notes/ideas.txt', 'Work/report.txt', 'Work/plan.txt', 'Family/recipes.txt', 'School/essay.txt', 'Invoices/may.txt', 'Invoices/june.txt', 'Letters/draft.txt'];
+  let step = 0;
+  state.demoTimer = setInterval(() => {
+    const changes = [];
+    if (step < 3) {
+      changes.push({ kind: 'modified', path: docs[step], ent: 4.4, prevEnt: 4.3 });
+    } else if (step < 6) {
+      for (let i = 0; i < 4; i++) changes.push({ kind: 'modified', path: docs[(step * 3 + i) % docs.length], ent: 4.5, prevEnt: 4.4 });
+    } else if (step < 12) {
+      for (let i = 0; i < 3; i++) {
+        const from = docs[(step * 2 + i) % docs.length];
+        changes.push({ kind: 'renamed', path: `${from}.locked`, from, appended: true, ent: 7.96, prevEnt: 4.4 });
+      }
+    } else if (step === 12) {
+      changes.push({ kind: 'created', path: 'HOW_TO_DECRYPT_FILES.txt', ent: 4.2, prevEnt: null });
+    } else if (step > 24) {
+      stopAll();
+      return;
+    }
+    if (changes.length) addFeed(analyzer.ingest(changes));
+    state.lastScan = Date.now();
+    step++;
+    render();
+  }, 700);
+  render();
+}
+
+// ---------- self-test in the chosen folder ----------
+
+async function selfTest() {
+  if (state.selfTesting || !state.root) return;
+  state.selfTesting = true;
+  render();
+  try {
+    const wait = readSettings().intervalSec * 1000 + 1000;
+    await runSelfTest(state.root, wait, showProgress);
+    showProgress('Self-test finished and the test files were removed.');
+    setTimeout(() => showProgress(''), 6000);
+  } catch (err) {
+    showProgress('');
+    showNotice(err.message || 'The self-test could not run.');
+  } finally {
+    state.selfTesting = false;
+    render();
+  }
+}
+
+// ---------- wiring ----------
+
+$('pickBtn').addEventListener('click', startWatching);
+$('stopBtn').addEventListener('click', stopAll);
+$('demoBtn').addEventListener('click', startDemo);
+$('selfTestBtn').addEventListener('click', selfTest);
+$('dismissBtn').addEventListener('click', () => { $('latch').hidden = true; });
+$('clearBtn').addEventListener('click', () => { state.feed = []; renderFeed(); });
+for (const id of ['optThreshold', 'optWindow']) {
+  $(id).addEventListener('change', () => {
+    const c = readSettings();
+    analyzer.configure({ threshold: c.threshold, windowSec: c.windowSec });
+    render();
+  });
+}
+$('notifyBtn').addEventListener('click', async () => {
+  await Notification.requestPermission();
+  $('notifyBtn').hidden = Notification.permission !== 'default';
+});
+
+if ('Notification' in window && Notification.permission === 'default') $('notifyBtn').hidden = false;
+
+if (!supported) {
+  $('pickBtn').disabled = true;
+  showNotice('Live folder monitoring is not supported in this browser. On phones, you can try the demo; to monitor a folder, use Chrome or Edge on a desktop computer.');
+} else if (!window.isSecureContext) {
+  $('pickBtn').disabled = true;
+  showNotice('Folder access needs a secure page (https:// or localhost).');
+}
+
+setInterval(() => { if (state.mode !== 'idle') render(); }, 1000);   // lets the score fade as time passes
+renderFeed();
+render();
+
+  </script>
+</body>
+</html>
